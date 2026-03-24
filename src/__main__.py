@@ -1,5 +1,4 @@
 import json
-from pydantic import ValidationError
 from pathlib import Path
 from models import Function, Calling
 from test import Startword
@@ -17,7 +16,7 @@ def main():
         with open(functions_files, "r") as fd1_def, \
              open(test_files, "r") as fd2_func:
             list_def = json.load(fd1_def)
-            list_func = json.load(fd2_func)   
+            list_func = json.load(fd2_func)
             get_functions = [Function(**item) for item in list_def]
             get_callable = [Calling(**item) for item in list_func]
         tester = Startword()
