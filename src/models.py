@@ -3,12 +3,12 @@ from typing import Dict, Optional, Literal
 
 
 class Parameters(BaseModel):
-    type: Literal["number", "string", "boolean"]
+    type: Literal["number", "string", "boolean", "integer"]
     description: Optional[str] = None
 
 
 class Returns(BaseModel):
-    type: Literal["number", "string", "boolean"]
+    type: Literal["number", "string", "boolean", "integer"]
     description: Optional[str] = None
 
 
