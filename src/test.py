@@ -42,6 +42,8 @@ class Startword:
         static_encoded = list(self.llm_model.encode(full_prompt)[0])
         encode_func_list = []
         quote_id = self.llm_model.encode('"')[0][-1]
+        id_bracket_close = self.llm_model.encode("}")[0][-1]
+        id_bracket_open = self.llm_model.encode("{")[0][-1]
         for name_func in mask_func:
             name_func_str = str(name_func)
             encode_func_list.append(
@@ -68,26 +70,23 @@ class Startword:
                 bracket_stack = 1
                 generated_text = ""
                 masking_flag = True
+                flag_first = True
                 for _ in range(50):
                     logits = self.llm_model.get_logits_from_input_ids(
                         generate_prompt_add
                     )
-
-                    if hasattr(logits, "shape") and len(logits.shape) > 1:
-                        logits_list = list(logits[0])
-                    elif (
-                        isinstance(logits, list)
-                        and len(logits) > 0
-                        and isinstance(logits[0], list)
-                    ):
-                        logits_list = list(logits[0])
-                    else:
-                        logits_list = list(logits)
-                    if masking_flag:
+                    try:
+                        logits_list = logits[0]
+                        _ = len(logits_list)
+                    except (TypeError, IndexError):
+                        logits_list = logits
+                    if masking_flag and flag_first is True:
+                        v_size = len(logits_list)
                         valid_tokens = [
-                            tid for tid in encode_func_value
-                            if tid < len(logits_list)
+                            tid for tid in encode_func_value if tid < v_size
                         ]
+                        flag_first = False
+                    if masking_flag:
                         if valid_tokens:
                             logits_max_index = max(
                                 valid_tokens,
@@ -102,9 +101,9 @@ class Startword:
                     generate_prompt_add.append(logits_max_index)
                     token_text = self.llm_model.decode(logits_max_index)
                     generated_text += token_text
-                    if "}" in token_text:
+                    if logits_max_index == id_bracket_close:
                         bracket_stack -= 1
-                    if "{" in token_text:
+                    if logits_max_index == id_bracket_open:
                         bracket_stack += 1
                     if masking_flag and logits_max_index == quote_id:
                         masking_flag = False
@@ -131,4 +130,3 @@ class Startword:
                 else:
                     fd.write("\n")
             fd.write("]\n")
-
