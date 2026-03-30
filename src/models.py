@@ -1,38 +1,41 @@
 from pydantic import BaseModel
-from typing import Dict, Optional, Literal
+from typing import Any, Dict, Optional, Literal
 
 
 class Parameters(BaseModel):
-    """
-    Represents the definition of a single function parameter.
+    """Represents the definition of a single function parameter.
+
     Attributes:
-        type: The data type allowed (number, string, boolean, or integer).
-        description: A brief explanation of what the parameter represents.
+        type: The data type allowed for the parameter.
+        description: A brief explanation of the parameter.
     """
+
     type: Literal["number", "string", "boolean", "integer"]
     description: Optional[str] = None
 
 
 class Returns(BaseModel):
-    """
-    Defines the structure and type of the value returned by a function.
+    """Defines the return value of a function.
+
     Attributes:
         type: The expected return data type.
         description: A brief explanation of the returned value.
     """
+
     type: Literal["number", "string", "boolean", "integer"]
     description: Optional[str] = None
 
 
 class Function(BaseModel):
-    """
-    A complete definition of a tool/function available for the LLM.
+    """A complete definition of a callable tool/function.
+
     Attributes:
         name: The unique identifier of the function.
-        description: Detailed information on what the function does.
-        parameters: A mapping of parameter names to their definitions.
+        description: What the function does.
+        parameters: Mapping of parameter names to their definitions.
         returns: The definition of the return value.
     """
+
     name: str
     description: str
     parameters: Dict[str, Parameters]
@@ -40,9 +43,24 @@ class Function(BaseModel):
 
 
 class Calling(BaseModel):
-    """
-    Represents a test case or a user query to be processed.
+    """A user query to be processed by the function calling engine.
+
     Attributes:
-        prompt: The natural language string describing the task for the LLM.
+        prompt: The natural language query.
     """
+
     prompt: str
+
+
+class FunctionCallResult(BaseModel):
+    """Result of a function call prediction.
+
+    Attributes:
+        prompt: The original natural-language request.
+        name: The name of the function to call.
+        parameters: All required arguments with correct types.
+    """
+
+    prompt: str
+    name: str
+    parameters: Dict[str, Any]
