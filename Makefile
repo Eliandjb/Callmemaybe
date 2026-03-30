@@ -1,36 +1,28 @@
-PYTHON = python3
-PIP = pip3
+PYTHON = uv run python
 MAIN = src/__main__.py
-LINT_FLAGS = --warn-return-any
---warn-unused-ignores--ignore-missing-imports--disallow-untyped-defs
---check-untyped-defs
 
-
-.PHONY: all install run debug clean lint lint-strict m ms
-
-all: install run
+all: install
 
 install:
-	$(PIP) install pydantic python-dotenv flake8 mypy build
-
+	uv sync
 
 run:
-	$(PYTHON) $(MAIN)
+	uv run $(MAIN)
 
 debug:
-	$(PYTHON) -m pdb $(MAIN) $(CONFIG)
-
+	uv run python -m pdb $(MAIN)
 
 clean:
-	rm -rf __pycache__ .mypy_cache .env dist build *.egg-info
+	rm -rf __pycache__ .pytest_cache .mypy_cache .uv
+	find . -type d -name "__pycache__" -exec rm -rf {} +
+	find . -type f -name "*.pyc" -delete
 
 lint:
-	flake8 .
-	mypy $(LINT_FLAGS) .
+	uv run flake8 .
+	uv run mypy . --warn-return-any --warn-unused-ignores --ignore-missing-imports --disallow-untyped-defs --check-untyped-defs
 
 lint-strict:
-	flake8 .
-	mypy --strict .
+	uv run flake8 .
+	uv run mypy . --strict
 
-package:
-	$(PYTHON) -m build
+.PHONY: all install run debug clean lint lint-strict
