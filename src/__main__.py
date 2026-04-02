@@ -4,7 +4,6 @@ import json
 import sys
 from pathlib import Path
 from typing import List
-
 from src.models import Function, Calling
 from src.test import ConstrainedDecoder
 

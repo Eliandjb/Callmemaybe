@@ -1,11 +1,10 @@
 import json
 import re
 from typing import Any, Dict, List, Set, Tuple
-
 import numpy as np
-
 from llm_sdk import Small_LLM_Model
 from src.models import Calling, Function, FunctionCallResult
+from typing import cast
 
 
 NEG_INF: float = -1e9
@@ -35,7 +34,7 @@ class ConstrainedDecoder:
             A list of integer token IDs.
         """
         tensor = self.llm.encode(text)
-        return tensor[0].tolist()
+        return cast(List[int], tensor[0].tolist())
 
     def _get_logits(self, input_ids: List[int]) -> np.ndarray:
         """Get next-token logits from the model.
