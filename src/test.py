@@ -25,10 +25,6 @@ class ConstrainedDecoder:
         self._stop_token_ids: Set[int] = set()
         self._build_number_tokens()
 
-    # ------------------------------------------------------------------
-    # Helpers
-    # ------------------------------------------------------------------
-
     def _encode(self, text: str) -> List[int]:
         """Encode text to a flat list of native Python int IDs.
 
@@ -93,7 +89,6 @@ class ConstrainedDecoder:
             vocab_path = self.llm.get_path_to_vocab_file()
             with open(vocab_path, "r", encoding="utf-8") as fh:
                 raw_vocab: Dict[str, int] = json.load(fh)
-
             for tok_str, tid in raw_vocab.items():
                 clean = tok_str.replace("\u0120", "").strip()
                 if not clean:
@@ -105,10 +100,6 @@ class ConstrainedDecoder:
                     self._stop_token_ids.add(tid)
         except Exception:
             pass
-
-    # ------------------------------------------------------------------
-    # Function name selection  (trie-based constrained decoding)
-    # ------------------------------------------------------------------
 
     def _select_function_name(
         self,
@@ -137,45 +128,30 @@ class ConstrainedDecoder:
         )
         ids = list(prompt_ids)
         pos = 0
-
         while len(candidates) > 1:
-            # Collect every token that could appear at *pos*
             allowed: Set[int] = set()
             for _name, seq in candidates:
                 if pos < len(seq):
                     allowed.add(seq[pos])
-
             if not allowed:
                 break
-
-            # If there is only one option, skip the LLM call
             if len(allowed) == 1:
                 chosen = next(iter(allowed))
             else:
                 chosen = self._masked_next(ids, allowed)
-
             ids.append(chosen)
             pos += 1
-
-            # Keep only candidates whose token at pos-1 matches
             candidates = [
                 (name, seq)
                 for name, seq in candidates
                 if pos <= len(seq) and seq[pos - 1] == chosen
             ]
-
-            # If exactly one candidate is fully decoded, return it
             complete = [n for n, s in candidates if pos == len(s)]
             if len(complete) == 1:
                 return complete[0]
-
         if candidates:
             return candidates[0][0]
         return function_names[0]
-
-    # ------------------------------------------------------------------
-    # Parameter value generation
-    # ------------------------------------------------------------------
 
     def _generate_string_value(
         self, base_ids: List[int], max_tokens: int = 120
@@ -200,16 +176,13 @@ class ConstrainedDecoder:
         for _ in range(max_tokens):
             chosen = self._greedy_next(ids)
             tok_text = self.llm.decode(chosen)
-
             if chosen == quote_id:
                 break
             if '"' in tok_text:
                 text += tok_text.split('"')[0]
                 break
-
             text += tok_text
             ids.append(chosen)
-
         return text
 
     def _generate_number_value(
@@ -242,22 +215,17 @@ class ConstrainedDecoder:
             for tid in self._stop_token_ids:
                 if tid < len(logits):
                     mask[tid] = logits[tid]
-
             chosen = int(np.argmax(mask))
-
             if chosen in self._stop_token_ids:
                 break
-
             tok_text = self.llm.decode(chosen)
             clean = tok_text.strip()
             if not clean:
                 break
             if not all(c in number_chars for c in clean):
                 break
-
             text += clean
             ids.append(chosen)
-
         text = text.strip()
         try:
             return float(text)
@@ -310,18 +278,12 @@ class ConstrainedDecoder:
             allowed.add(true_ids[0])
         if false_ids:
             allowed.add(false_ids[0])
-
         if not allowed:
             return True
-
         chosen = self._masked_next(list(base_ids), allowed)
         if true_ids and chosen == true_ids[0]:
             return True
         return False
-
-    # ------------------------------------------------------------------
-    # Regex parameter post-processing
-    # ------------------------------------------------------------------
 
     def _fix_regex_params(
         self,
@@ -341,27 +303,16 @@ class ConstrainedDecoder:
             The corrected parameters dict.
         """
         prompt_lower = prompt.lower()
-
-        # --- Extract source_string from quoted text in the prompt ---
-        # Try double quotes first, then single quotes
         quoted = re.findall(r'"([^"]+)"', prompt)
         if not quoted:
             quoted = re.findall(r"'([^']+)'", prompt)
-
-        # --- Detect "replace all <PATTERN> in <SOURCE> with <REPLACEMENT>" ---
-
-        # Pattern: "Replace all numbers/digits in ... with ..."
         if ("number" in prompt_lower or "digit" in prompt_lower):
             params["regex"] = "\\d+"
-            # Extract replacement from "with <WORD>"
             m = re.search(r'\bwith\s+(\S+)\s*$', prompt.strip())
             if m:
                 params["replacement"] = m.group(1)
-
-        # Pattern: "Replace all vowels in ... with ..."
         elif "vowel" in prompt_lower:
             params["regex"] = "[aeiouAEIOU]"
-            # Extract replacement: "with asterisks" -> "*", else literal
             m = re.search(r'\bwith\s+(\S+)\s*$', prompt.strip())
             if m:
                 repl = m.group(1)
@@ -369,11 +320,10 @@ class ConstrainedDecoder:
                     params["replacement"] = "*"
                 else:
                     params["replacement"] = repl
-
-        # Pattern: "Substitute the word 'X' with 'Y' in ..."
         elif "substitute" in prompt_lower or "replace" in prompt_lower:
             m_word = re.search(
-                r"(?:substitute|replace)\s+(?:the\s+)?word\s+'([^']+)'\s+with\s+'([^']+)'",
+                r"(?:substitute|replace)\s+(?:the\s+)?word\s+'([^']+)'\s+with\
+                    s+'([^']+)'",
                 prompt,
                 re.IGNORECASE,
             )
@@ -382,13 +332,11 @@ class ConstrainedDecoder:
                 replacement = m_word.group(2)
                 params["regex"] = "\\b" + re.escape(word) + "\\b"
                 params["replacement"] = replacement
-                # Source string is what follows "in"
                 m_in = re.search(r"\bin\s+'([^']+)'", prompt)
                 if not m_in:
                     m_in = re.search(r'\bin\s+"([^"]+)"', prompt)
                 if m_in:
                     params["source_string"] = m_in.group(1)
-
         return params
 
     def _fix_read_file_params(
@@ -408,9 +356,9 @@ class ConstrainedDecoder:
         Returns:
             The corrected parameters dict.
         """
-        # Pattern: "Read [the file at] <PATH> with <ENCODING> encoding"
         m = re.search(
-            r'[Rr]ead\s+(?:the\s+file\s+at\s+)?(\S+)\s+with\s+(\S+)\s+encoding',
+            r'([Rr]ead\s+(?:the\s+file\s+at\s+)?(\S+)\s+with\s+(\S+)\
+            \s+encoding)',
             prompt,
         )
         if m:
@@ -435,15 +383,10 @@ class ConstrainedDecoder:
         Returns:
             The corrected parameters dict.
         """
-        # Pattern: "Format template: <TEMPLATE>"
         m = re.search(r'[Ff]ormat\s+template:\s+(.*)', prompt)
         if m:
             params["template"] = m.group(1)
         return params
-
-    # ------------------------------------------------------------------
-    # Main pipeline
-    # ------------------------------------------------------------------
 
     def process_prompt(
         self,
@@ -472,8 +415,6 @@ class ConstrainedDecoder:
         )
         dynamic_ids = self._encode(dynamic_prompt)
         prompt_ids = static_ids + dynamic_ids
-
-        # Step 1: select function name
         selected_name = self._select_function_name(
             prompt_ids, func_names
         )
@@ -481,15 +422,8 @@ class ConstrainedDecoder:
         if func_def is None:
             func_def = functions[0]
             selected_name = func_def.name
-
-        # Step 2: extract parameters
         params: Dict[str, Any] = {}
-
         for param_name, param_info in func_def.parameters.items():
-            # Build a JSON-like context so the LLM sees the
-            # exact output structure it needs to complete.
-            # Include the full prompt and function description
-            # to guide extraction.
             ctx = (
                 selected_name + "\n"
                 "[TASK]\n"
@@ -514,9 +448,7 @@ class ConstrainedDecoder:
                     + ", "
                 )
             ctx += json.dumps(param_name) + ": "
-
             param_ids = prompt_ids + self._encode(ctx)
-
             val: Any
             if param_info.type == "string":
                 quote_ids = self._encode('"')
@@ -535,15 +467,12 @@ class ConstrainedDecoder:
                     param_ids + quote_ids
                 )
             params[param_name] = val
-
-        # Post-process specific function parameters
         if selected_name == "fn_substitute_string_with_regex":
             params = self._fix_regex_params(prompt, params)
         elif selected_name == "fn_read_file":
             params = self._fix_read_file_params(prompt, params)
         elif selected_name == "fn_format_template":
             params = self._fix_format_template_params(prompt, params)
-
         return FunctionCallResult(
             prompt=prompt,
             name=selected_name,
@@ -600,9 +529,7 @@ class ConstrainedDecoder:
             '"regex": "\\\\d+", "replacement": "X"}}\n'
         )
         static_ids = self._encode(system_prompt)
-
         results: List[Dict[str, Any]] = []
-
         for idx, call in enumerate(callables):
             label = call.prompt[:60]
             print(
@@ -629,8 +556,6 @@ class ConstrainedDecoder:
                     "name": func_names[0] if func_names else "",
                     "parameters": {},
                 })
-
         with open(output_path, "w", encoding="utf-8") as fh:
             json.dump(results, fh, indent=2, ensure_ascii=False)
-
         print("\nResults written to " + output_path)

@@ -56,7 +56,6 @@ def main() -> None:
         base_dir = Path(__file__).resolve().parent.parent
         default_input = base_dir / "data" / "input"
         default_output = base_dir / "data" / "output"
-
         functions_path = Path(
             args.functions_definition
             if args.functions_definition
@@ -76,25 +75,19 @@ def main() -> None:
                 default_output / "function_calling_results.json"
             )
         )
-
-        # --- validate inputs ---
         if not functions_path.exists():
             print(
                 "Error: functions definition file not found: "
                 + str(functions_path)
             )
             sys.exit(1)
-
         if not input_path.exists():
             print(
                 "Error: input file not found: "
                 + str(input_path)
             )
             sys.exit(1)
-
         output_path.parent.mkdir(parents=True, exist_ok=True)
-
-        # --- load JSON ---
         with open(functions_path, "r", encoding="utf-8") as fh:
             try:
                 raw_funcs: List[dict] = json.load(fh)
@@ -105,7 +98,6 @@ def main() -> None:
                     + ": " + str(err)
                 )
                 sys.exit(1)
-
         with open(input_path, "r", encoding="utf-8") as fh:
             try:
                 raw_tests: List[dict] = json.load(fh)
@@ -116,10 +108,8 @@ def main() -> None:
                     + ": " + str(err)
                 )
                 sys.exit(1)
-
         functions = [Function(**item) for item in raw_funcs]
         callables = [Calling(**item) for item in raw_tests]
-
         print(
             "Loaded "
             + str(len(functions))
@@ -127,8 +117,6 @@ def main() -> None:
             + str(len(callables))
             + " prompts."
         )
-
-        # --- run ---
         decoder = ConstrainedDecoder()
         decoder.run(functions, callables, str(output_path))
 
